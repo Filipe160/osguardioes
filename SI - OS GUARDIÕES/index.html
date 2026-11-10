@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Os Guardiões – Segurança Colaborativa em BH</title>
+  
+  <!-- CSS do Mapa Leaflet (100% Gratuito, Sem Chave API) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Nosso CSS na mesma pasta -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- CABEÇALHO GLOBAL -->
+  <header class="app-header">
+    <div class="container header-content">
+      <div class="brand" onclick="navegarPara('tela-feed')" role="button" tabindex="0">
+        <span class="brand-icon">🛡️</span>
+        <div>
+          <h1>Os Guardiões</h1>
+          <span class="subtitle">Segurança Colaborativa • Belo Horizonte</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-contraste" class="btn-outline btn-sm" onclick="alternarFonte()" title="Aumentar tamanho da letra (Acessibilidade)">
+          A+ Letra Maior
+        </button>
+        <button id="btn-moderacao" class="btn-warning btn-sm hidden" onclick="navegarPara('tela-moderacao')">
+          ⚖️ Moderação (<span id="contador-denuncias">0</span>)
+        </button>
+        <div id="area-usuario">
+          <button class="btn-primary btn-sm" onclick="navegarPara('tela-login')">Entrar / Cadastrar</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- BANNER EDUCATIVO FIXO -->
+  <div class="legal-banner" role="region" aria-label="Aviso Legal">
+    <div class="container">
+      <strong>⚠️ Aviso Importante:</strong> Esta é uma plataforma comunitária colaborativa. Os relatos aqui registrados <strong>não substituem o 190 (Polícia Militar)</strong> nem valem como Boletim de Ocorrência oficial.
+    </div>
+  </div>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="container main-content">
+
+    <!-- Notificação / Feedback Visual -->
+    <div id="toast-feedback" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <!-- ==========================================
+         TELA 1: MAPA DE CALOR, FILTROS E HISTÓRICO (CSU01 / CSU02)
+         ========================================== -->
+    <section id="tela-feed" class="screen active">
+      <div class="feed-controls">
+        <h2>Mapa Comunitário e Histórico de Relatos</h2>
+        <p class="section-desc">Consulte livremente a concentração de relatos por região em Belo Horizonte sem precisar de cadastro.</p>
+
+        <!-- CARTÃO DO MAPA DE CALOR INTERATIVO -->
+        <div class="map-card">
+          <div class="map-header">
+            <div>
+              <strong>🗺️ Mapa de Calor de Ocorrências (Belo Horizonte)</strong>
+              <span class="map-subtitle">As áreas mais quentes indicam maior volume de relatos e confirmações comunitárias.</span>
+            </div>
+            <div class="map-controls">
+              <button id="btn-toggle-heat" class="btn-sm btn-primary" onclick="alternarCamadaCalor()">
+                🔥 Ocultar/Mostrar Calor
+              </button>
+              <button class="btn-sm btn-secondary" onclick="centralizarMapaBH()">
+                🎯 Centralizar BH
+              </button>
+            </div>
+          </div>
+
+          <!-- Div onde o Mapa é renderizado -->
+          <div id="mapa-bh" class="map-container" aria-label="Mapa de calor de ocorrências em Belo Horizonte"></div>
+
+          <div class="map-legend">
+            <span><strong>Legenda de Concentração:</strong></span>
+            <span class="legend-item"><i class="dot dot-low"></i> Baixa</span>
+            <span class="legend-item"><i class="dot dot-med"></i> Moderada</span>
+            <span class="legend-item"><i class="dot dot-high"></i> Alta Concentração</span>
+            <span class="legend-privacy">🔒 Localizações aproximadas por bairro/referência para proteger a privacidade (LGPD).</span>
+          </div>
+        </div>
+
+        <!-- Barra de Busca e Filtros -->
+        <div class="filter-box">
+          <div class="search-row">
+            <input type="text" id="filtro-texto" placeholder="Buscar por palavra-chave ou ponto de referência..." oninput="aplicarFiltros()">
+            <select id="filtro-bairro" onchange="aplicarFiltros()">
+              <option value="TODOS">📍 Todos os Bairros (BH)</option>
+              <option value="Barreiro">Barreiro</option>
+              <option value="Buritis">Buritis</option>
+              <option value="Centro">Centro</option>
+              <option value="Coração Eucarístico">Coração Eucarístico</option>
+              <option value="Pampulha">Pampulha</option>
+              <option value="Savassi">Savassi</option>
+              <option value="Venda Nova">Venda Nova</option>
+              <option value="Zona Leste">Zona Leste</option>
+            </select>
+            <select id="filtro-periodo" onchange="aplicarFiltros()">
+              <option value="TODOS">🕒 Qualquer Período</option>
+              <option value="24H">Últimas 24 horas</option>
+              <option value="7D">Últimos 7 dias</option>
+            </select>
+          </div>
+
+          <!-- Carrossel de Chips -->
+          <div class="chips-carousel" role="group" aria-label="Filtros Rápidos por Categoria">
+            <button class="chip active" onclick="selecionarCategoria('TODAS', this)">Todos os Relatos</button>
+            <button class="chip" onclick="selecionarCategoria('Furto/Roubo de Celular', this)">📱 Furto/Roubo de Celular</button>
+            <button class="chip" onclick="selecionarCategoria('Assalto a Transeunte', this)">🚶 Assalto a Transeunte</button>
+            <button class="chip" onclick="selecionarCategoria('Roubo/Furto de Veículos', this)">🏍️ Roubo/Furto de Veículos</button>
+            <button class="chip" onclick="selecionarCategoria('Arrombamento/Comércio', this)">🏪 Comércio / Iluminação</button>
+            <button class="chip" onclick="selecionarCategoria('CONFIRMADOS', this)">✅ Mais Confirmados</button>
+          </div>
+
+          <!-- Indicador de Filtros Ativos -->
+          <div id="barra-filtros-ativos" class="active-filters hidden">
+            <span>Filtros aplicados: <strong id="texto-filtros-ativos"></strong></span>
+            <button class="btn-link" onclick="limparFiltros()">✖ Limpar filtros</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de Cards de Relatos -->
+      <div id="lista-relatos" class="cards-grid"></div>
+    </section>
+
+    <!-- ==========================================
+         TELA 2: DETALHES DO RELATO E VOTAÇÃO (CSU04 / CSU05 / CSU06)
+         ========================================== -->
+    <section id="tela-detalhes" class="screen hidden">
+      <div class="top-nav-bar">
+        <button class="btn-secondary" onclick="navegarPara('tela-feed')">← Voltar ao Histórico e Mapa</button>
+        <button class="btn-danger-outline" onclick="abrirModalDenuncia()">🚩 Denunciar Relato</button>
+      </div>
+
+      <article id="conteudo-detalhe" class="detail-card"></article>
+
+      <!-- Modal de Sinalização/Denúncia -->
+      <div id="modal-denuncia" class="modal-overlay hidden">
+        <div class="modal-card">
+          <h3>🚩 Sinalizar Relato para a Moderação</h3>
+          <p class="modal-note">🔒 <strong>Sua denúncia é 100% anônima</strong> e será analisada apenas pelos moderadores da plataforma.</p>
+          
+          <label for="motivo-denuncia">Qual é o problema com este relato?</label>
+          <select id="motivo-denuncia">
+            <option value="">Selecione um motivo...</option>
+            <option value="Exposição de Dados Pessoais (LGPD)">Exposição de dados pessoais, nomes ou placas (LGPD)</option>
+            <option value="Boato Falso / Pânico Infundado">Informação claramente falsa / Boato para gerar pânico</option>
+            <option value="Discurso de Ódio ou Ofensa">Discurso de ódio, preconceito ou linchamento virtual</option>
+            <option value="Relato Duplicado ou Spam">Relato repetido ou propaganda comercial</option>
+          </select>
+
+          <label for="detalhe-denuncia">Observação adicional (opcional):</label>
+          <textarea id="detalhe-denuncia" rows="3" placeholder="Explique brevemente o motivo da sinalização..."></textarea>
+
+          <div class="modal-actions">
+            <button class="btn-secondary" onclick="fecharModalDenuncia()">Cancelar</button>
+            <button class="btn-danger" onclick="confirmarDenuncia()">Enviar para Moderação</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TELA 3: CADASTRAR NOVO RELATO (CSU03)
+         ========================================== -->
+    <section id="tela-cadastro" class="screen hidden">
+      <div class="top-nav-bar">
+        <button class="btn-secondary" onclick="navegarPara('tela-feed')">← Cancelar e Voltar</button>
+      </div>
+
+      <div class="form-card">
+        <h2>➕ Registrar Novo Relato Comunitário</h2>
+        <p class="section-desc">Sua identidade é protegida. O relato atualizará automaticamente o histórico e o Mapa de Calor do bairro selecionado.</p>
+
+        <form id="form-novo-relato" onsubmit="salvarNovoRelato(event)">
+          <div class="form-group">
+            <label for="relato-categoria">
+              Categoria da Ocorrência *
+              <span class="tooltip-help" title="Furto: sem violência ou ameaça. Roubo/Assalto: quando há abordagem, ameaça ou violência.">ℹ️ Ajuda: Diferença entre Furto e Roubo</span>
+            </label>
+            <select id="relato-categoria" required>
+              <option value="">Selecione o tipo de acontecimento...</option>
+              <option value="Furto/Roubo de Celular">📱 Furto ou Roubo de Celular</option>
+              <option value="Assalto a Transeunte">🚶 Assalto a Pedestre / Transeunte</option>
+              <option value="Roubo/Furto de Veículos">🏍️ Roubo ou Furto de Veículo / Moto</option>
+              <option value="Arrombamento/Comércio">🏪 Ocorrência em Comércio / Fiação / Iluminação</option>
+            </select>
+            <small class="help-text">💡 <strong>Dica:</strong> Furto ocorre sem ameaça presencial; Roubo/Assalto envolve abordagem ou violência.</small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="relato-bairro">Bairro de Belo Horizonte *</label>
+              <select id="relato-bairro" required>
+                <option value="">Selecione o bairro...</option>
+                <option value="Barreiro">Barreiro</option>
+                <option value="Buritis">Buritis</option>
+                <option value="Centro">Centro</option>
+                <option value="Coração Eucarístico">Coração Eucarístico</option>
+                <option value="Pampulha">Pampulha</option>
+                <option value="Savassi">Savassi</option>
+                <option value="Venda Nova">Venda Nova</option>
+                <option value="Zona Leste">Zona Leste</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="relato-referencia">Ponto de Referência Público *</label>
+              <input type="text" id="relato-referencia" placeholder="Ex.: Próximo à praça principal ou ponto de ônibus" required>
+              <small class="help-text warning-text">🔒 Para sua segurança (LGPD), <strong>não informe número exato de casas</strong>, placas nem nomes de pessoas.</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="relato-data">Data do Fato *</label>
+              <input type="date" id="relato-data" required>
+            </div>
+
+            <div class="form-group">
+              <label for="relato-hora">Horário Aproximado *</label>
+              <input type="time" id="relato-hora" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="relato-descricao">Descrição Detalhada do Acontecimento *</label>
+            <textarea id="relato-descricao" rows="4" placeholder="Descreva como aconteceu, quantas pessoas abordaram, sentido tomado e cuidados recomendados para quem passa pelo local..." required></textarea>
+            <div id="alerta-lgpd" class="error-box hidden"></div>
+          </div>
+
+          <div class="sticky-footer-actions">
+            <button type="button" class="btn-secondary" onclick="navegarPara('tela-feed')">Cancelar</button>
+            <button type="submit" id="btn-submit-relato" class="btn-primary">Publicar Relato na Comunidade</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TELA 4: AUTENTICAÇÃO SIMPLIFICADA (CSU07)
+         ========================================== -->
+    <section id="tela-login" class="screen hidden">
+      <div class="top-nav-bar">
+        <button class="btn-secondary" onclick="navegarPara('tela-feed')">← Voltar para Consulta Livre</button>
+      </div>
+
+      <div class="auth-card">
+        <div class="auth-tabs">
+          <button id="tab-entrar" class="auth-tab active" onclick="alternarAbaAuth('entrar')">Entrar na Conta</button>
+          <button id="tab-criar" class="auth-tab" onclick="alternarAbaAuth('criar')">Criar Conta Rápida</button>
+        </div>
+
+        <form id="form-auth" onsubmit="processarAutenticacao(event)">
+          <h2 id="titulo-auth">Acesso do Colaborador</h2>
+          <p class="section-desc">A consulta é 100% livre. O login é necessário apenas para publicar relatos ou votar na veracidade das informações.</p>
+
+          <div id="grupo-nome" class="form-group hidden">
+            <label for="auth-nome">Apelido ou Nome (Não aparecerá nos relatos)</label>
+            <input type="text" id="auth-nome" placeholder="Ex.: Morador Buritis">
+          </div>
+
+          <div class="form-group">
+            <label for="auth-email">Seu E-mail *</label>
+            <input type="email" id="auth-email" placeholder="exemplo@email.com" required>
+          </div>
+
+          <div class="form-group">
+            <label for="auth-senha">Sua Senha *</label>
+            <div class="password-wrapper">
+              <input type="password" id="auth-senha" placeholder="Digite sua senha" required>
+              <button type="button" class="btn-toggle-pass" onclick="mostrarOcultarSenha()">👁️ Mostrar</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="auth-perfil">Perfil de Simulação (Para Testes Acadêmicos):</label>
+            <select id="auth-perfil">
+              <option value="COLABORADOR">👤 Usuário Registrador / Colaborador (Morador)</option>
+              <option value="MODERADOR">⚖️ Usuário Moderador (Dra. Beatriz - CONSEP)</option>
+            </select>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="auth-lgpd" checked required>
+            <label for="auth-lgpd">Estou ciente de que a plataforma protege meu anonimato público e que não devo publicar dados pessoais de terceiros (LGPD).</label>
+          </div>
+
+          <div id="erro-auth" class="error-box hidden"></div>
+
+          <button type="submit" class="btn-primary btn-block">Confirmar e Continuar</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TELA 5: PAINEL DE MODERAÇÃO COMUNITÁRIA (CSU08)
+         ========================================== -->
+    <section id="tela-moderacao" class="screen hidden">
+      <div class="top-nav-bar">
+        <button class="btn-secondary" onclick="navegarPara('tela-feed')">← Voltar ao Histórico</button>
+      </div>
+
+      <div class="moderation-panel">
+        <h2>⚖️ Painel de Gestão da Moderação</h2>
+        <p class="section-desc">Avalie relatos sinalizados pela comunidade por violação de privacidade (LGPD), ofensas ou alto índice de contestação.</p>
+
+        <div id="lista-moderacao" class="moderation-list"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- BOTÃO FLUTUANTE DE AÇÃO RÁPIDA (FAB) -->
+  <button id="fab-novo-relato" class="fab-btn" onclick="acionarNovoRelato()" title="Registrar um novo relato comunitário">
+    ➕ Novo Relato
+  </button>
+
+  <!-- RODAPÉ COM CANAIS OFICIAIS DE MINAS GERAIS -->
+  <footer class="app-footer">
+    <div class="container footer-content">
+      <div>
+        <strong>Canais Oficiais de Segurança Pública (Minas Gerais):</strong>
+        <p>Em caso de emergência em andamento ou registro policial oficial, acione imediatamente os órgãos competentes:</p>
+      </div>
+      <div class="official-links">
+        <span class="badge-official">🚓 PMMG Emergência: <strong>190</strong></span>
+        <span class="badge-official">📞 Disque-Denúncia Anônimo: <strong>181</strong></span>
+        <a href="https://delegaciavirtual.sids.mg.gov.br/" target="_blank" rel="noopener" class="badge-official link-official">🌐 Delegacia Virtual PCMG</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Bibliotecas Gratuitas do Mapa (Leaflet + Leaflet.heat - Sem necessidade de API Key) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <!-- Nosso Arquivo JS na mesma pasta -->
+  <script src="app.js"></script>
+</body>
+</html>
